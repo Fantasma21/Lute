@@ -16,7 +16,7 @@ class Sprite {
     this.framesMax = framesMax
     this.framesCurrent = 0
     this.framesElapsed = 0
-    this.framesHold = 10
+    this.framesHold = 5
     this.offset = offset
   }
 
@@ -124,6 +124,7 @@ class Fighter extends Sprite {
   }
 
   attack() {
+    this.switchSprite('ataque')
     this.isAttacking = true;
     setTimeout(() => {
       this.isAttacking = false;
@@ -131,6 +132,11 @@ class Fighter extends Sprite {
   }
 
   switchSprite (sprite){
+    if (
+      this.image === this.sprites.ataque.image && 
+      this.framesCurrent < this.sprites.ataque.framesMax -1
+      ) return
+
     switch (sprite){
       case 'parado':
         if (this.image !== this.sprites.parado.image){
@@ -159,7 +165,14 @@ class Fighter extends Sprite {
             this.framesMax = this.sprites.caindo.framesMax
             this.framesCurrent = 0
           }
-          break      
+          break  
+          case 'ataque':
+            if (this.image !== this.sprites.ataque.image){
+              this.image = this.sprites.ataque.image
+              this.framesMax = this.sprites.ataque.framesMax
+              this.framesCurrent = 0
+            }
+            break       
     }
   }
 }

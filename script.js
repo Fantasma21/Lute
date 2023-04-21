@@ -43,7 +43,7 @@ const player = new Fighter({
     },
     correndo: {
       imageSrc: '/jet/correndo.png',
-      framesMax: 4
+      framesMax: 6
       },
     salto: {
       imageSrc: '/jet/salto.png',
@@ -52,6 +52,10 @@ const player = new Fighter({
     caindo: {
       imageSrc: '/jet/caindo.png',
       framesMax: 2
+     },
+    ataque: {
+      imageSrc: '/jet/ataque.png',
+      framesMax: 5
      }
   }
 });
