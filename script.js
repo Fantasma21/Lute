@@ -18,7 +18,7 @@ const background = new Sprite({
 
 const player = new Fighter({
   position: {
-    x: 120,   //posição do player
+    x: 0,   //posição do player
     y: 0
   },
   velocity: {
@@ -29,11 +29,37 @@ const player = new Fighter({
     x: 0,
     y: 0
   },
+  imageSrc: '/jet/parado.png',  //renderização do player parado
+  framesMax: 4,  //quantidade de imagens
+  scale: 1,
+  offset:{
+    x: 0,
+    y: 30
+  },
+  sprites: {
+    parado: {
+      imageSrc: '/jet/parado.png',
+      framesMax: 4
+    },
+    correndo: {
+      imageSrc: '/jet/correndo.png',
+      framesMax: 4
+      },
+    salto: {
+      imageSrc: '/jet/salto.png',
+      framesMax: 2
+     },
+    caindo: {
+      imageSrc: '/jet/caindo.png',
+      framesMax: 2
+     }
+  }
 });
+
 
 const enemy = new Fighter({
   position: {
-    x: 850,     //posição do enemy
+    x: 400,     //posição do enemy
     y: 100,
   },
   velocity: {
@@ -71,17 +97,28 @@ function animate() {
   c.fillStyle = "black";
   c.fillRect(0, 0, canvas.width, canvas.height);
   background.update()
-  player.update();
-  enemy.update();
+  player.update()
+ // enemy.update();
 
   player.velocity.x = 0;
   enemy.velocity.x = 0;
 
   // player movement
+  
   if (keys.a.pressed && player.lastKey === "a") {
     player.velocity.x = -5;
+    player.switchSprite('correndo')
   } else if (keys.d.pressed && player.lastKey === "d") {
     player.velocity.x = 5;
+    player.switchSprite('correndo')
+  } else {
+    player.switchSprite('parado')
+  }
+
+  if (player.velocity.y < 0) {
+    player.switchSprite('salto')
+  } else if (player.velocity.y > 0) {
+    player.switchSprite('caindo')
   }
 
   // enemy movement

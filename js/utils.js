@@ -36,3 +36,9 @@ function rectangularColiision({ rectangle1, rectangle2 }) {
     determineWinner ({player, enemy, timerId })
   }
   }
+
+  
+
+
+
+  
