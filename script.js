@@ -56,9 +56,26 @@ const player = new Fighter({
     ataque: {
       imageSrc: '/jet/ataque.png',
       framesMax: 5
-     }
+     },
+     hit: {
+      imageSrc: '/jet/hit.png',
+      framesMax: 4
+     },
+     morto: {
+      imageSrc: '/jet/morto.png',
+      framesMax: 6
+     }  
+  },
+  atackBox: {
+    offset:{
+     x: 45,  //posicionamento da box de ataque
+     y: 10
+    },
+    //tamanho da box de ataque
+    width: 78,
+    height: 60
   }
-});
+})
 
 
 const enemy = new Fighter({
@@ -75,7 +92,53 @@ const enemy = new Fighter({
     x: -50,
     y: 0
   },
-});
+  imageSrc: '/s-quebrada/parado.png',  //renderização do player parado
+  framesMax: 5,  //quantidade de imagens
+  scale: 1,
+  offset:{
+    x: 0,
+    y: 30
+  },
+  sprites: {
+    parado: {
+      imageSrc: '/s-quebrada/parado.png',
+      framesMax: 5
+    },
+    correndo: {
+      imageSrc: '/s-quebrada/correndo.png',
+      framesMax: 3
+      },
+    salto: {
+      imageSrc: '/s-quebrada/salto.png',
+      framesMax: 2
+     },
+    caindo: {
+      imageSrc: '/s-quebrada/caindo.png',
+      framesMax: 2
+     },
+    ataque: {
+      imageSrc: '/s-quebrada/ataque.png',
+      framesMax: 5
+     },
+     hit:{
+      imageSrc: '/s-quebrada/hit.png',
+      framesMax: 3
+     },
+     morto: {
+      imageSrc: '/s-quebrada/morto.png',
+      framesMax: 6
+     }  
+
+    },
+    atackBox: {
+      offset:{
+       x: -58, //alcance do ataque
+       y: -10
+      },
+      width: 80,
+      height: 110
+    }
+})
 
 console.log(player);
 
@@ -102,7 +165,7 @@ function animate() {
   c.fillRect(0, 0, canvas.width, canvas.height);
   background.update()
   player.update()
- // enemy.update();
+ /enemy.update();
 
   player.velocity.x = 0;
   enemy.velocity.x = 0;
@@ -119,6 +182,7 @@ function animate() {
     player.switchSprite('parado')
   }
 
+  // pulando
   if (player.velocity.y < 0) {
     player.switchSprite('salto')
   } else if (player.velocity.y > 0) {
@@ -128,35 +192,58 @@ function animate() {
   // enemy movement
   if (keys.ArrowLeft.pressed && enemy.lastKey === "ArrowLeft") {
     enemy.velocity.x = -5;
+    enemy.switchSprite('correndo')
   } else if (keys.ArrowRight.pressed && enemy.lastKey === "ArrowRight") {
     enemy.velocity.x = 5;
+    enemy.switchSprite('correndo')
+  } else {
+    enemy.switchSprite('parado')
   }
 
-  // detectar colisão
+    // pulando
+    if (enemy.velocity.y < 0) {
+      enemy.switchSprite('salto')
+    } else if (enemy.velocity.y > 0) {
+      enemy.switchSprite('caindo')
+    }
+  
+
+  // detectar colisão e hit enemy
   if (
     rectangularColiision({
       rectangle1: player,
       rectangle2: enemy
     }) &&
-    player.isAttacking
+    player.isAttacking && 
+    player.framesCurrent === 3
   ) {
+    enemy.hit()
     player.isAttacking = false
-    enemy.health -= 10 // quantidade de vida retirada de 100
     document.querySelector('#enemyHealth').style.width = enemy.health + '%' // vida retirada em %
   }
+
+  //if player misses
+  if (player.isAttacking && player.framesCurrent === 3)
+  player.isAttacking = false
+
+  // this is where our player gets hit
 
   if (
     rectangularColiision({
       rectangle1: enemy,
       rectangle2: player
     }) &&
-    enemy.isAttacking
+    enemy.isAttacking && 
+    enemy.framesCurrent === 2
   ) {
+    player.hit()
     enemy.isAttacking = false
-    player.health -= 10
     document.querySelector('#playerHealth').style.width = player.health + '%' // vida retirada em %
-    
   }
+
+  //if player misses
+  if (enemy.isAttacking && enemy.framesCurrent === 2)
+  enemy.isAttacking = false
 
   // fim do jogo baseado na vida
  if (enemy.health <= 0 || player.health <= 0) {
@@ -168,6 +255,8 @@ animate();
 
 //movimentação do player nas teclas
 window.addEventListener("keydown", (event) => {
+  if(!player.dead){
+
   switch (event.key) {
     case "d":
       keys.d.pressed = true;
@@ -183,23 +272,28 @@ window.addEventListener("keydown", (event) => {
     case " ":
       player.attack();  //golpe do player
       break;
+  }
+}
 
+if(!enemy.dead) {
+  switch(event.key){
     case "ArrowRight": //controlar nas setas
       keys.ArrowRight.pressed = true;
       enemy.lastKey = "ArrowRight";
-      break;
+      break
     case "ArrowLeft":
       keys.ArrowLeft.pressed = true;
       enemy.lastKey = "ArrowLeft";
-      break;
+      break
     case "ArrowUp":
       enemy.velocity.y = -20;
-      break;
+      break
     case "ArrowDown":
-      enemy.attack();  //golpe do enemy
-      break;
+      enemy.attack()  //golpe do enemy
+      break
   }
-});
+}
+})
 
 window.addEventListener("keyup", (event) => {
   switch (event.key) {
