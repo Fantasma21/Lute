@@ -1,3 +1,26 @@
 *{
     box-sizing: border-box;
 }
+
+#timer{
+    border: 3px solid white;
+    color: white;
+    font-size: 25;
+    font-weight: bold;
+}
+
+#displayText{
+    font-size: 40px;
+}
+
+#pgf {
+    color: rgb(39, 30, 30);
+    position: absolute;  
+    align-items: center; 
+    justify-content: center; 
+    top: 540; 
+    right: 0;
+    bottom: 0; 
+    left: 0;  
+    display: flex;    
+}

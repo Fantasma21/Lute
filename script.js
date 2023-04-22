@@ -18,7 +18,7 @@ const background = new Sprite({
 
 const player = new Fighter({
   position: {
-    x: 0,   //posição do player
+    x: 10,   //posição do player
     y: 0
   },
   velocity: {
@@ -80,7 +80,7 @@ const player = new Fighter({
 
 const enemy = new Fighter({
   position: {
-    x: 400,     //posição do enemy
+    x: 800,     //posição do enemy
     y: 100,
   },
   velocity: {
@@ -132,7 +132,7 @@ const enemy = new Fighter({
     },
     atackBox: {
       offset:{
-       x: -58, //alcance do ataque
+       x: -61, //alcance do ataque
        y: -10
       },
       width: 80,
