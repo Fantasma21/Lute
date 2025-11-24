@@ -6,14 +6,12 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
   <canvas id="screen" width="800" height="400"></canvas>
 
   <script src="/socket.io/socket.io.js"></script>
 
-  <!-- IMPORTANTE → agora usamos ES MODULES -->
   <script type="module">
-    import { updateState, startRenderLoop } from "./render.js";
+    import { updateState, startRenderLoop, setLocalPlayerId } from "./render.js";
 
     const socket = io();
 
@@ -21,39 +19,50 @@
     const roomId = localStorage.getItem("roomId");
 
     if (!playerName || !roomId) {
-      alert("Erro: falta nome ou sala!");
+      alert("Falta nome ou sala!");
       window.location.href = "index.html";
     }
 
-    // Entrar na sala
+    // entrar na sala
     socket.emit("join-room", { playerName, roomId });
 
-    // Sala cheia
     socket.on("room-full", () => {
-      alert("A sala já tem 2 jogadores! Escolha outra.");
+      alert("Sala cheia!");
       window.location.href = "index.html";
     });
 
-    // Recebe estado
-    socket.on("room-state", (state) => {
+    // servidor confirma login e devolve o id do socket
+    socket.on("login-success", (data) => {
+      setLocalPlayerId(data.playerId);
+    });
+
+    // recebe estado (autoritative)
+    socket.on("state", (state) => {
       updateState(state);
     });
 
-    // Movimentação
-    document.addEventListener("keydown", (e) => {
-      const map = {
-        ArrowUp: "up",
-        ArrowDown: "down",
-        ArrowLeft: "left",
-        ArrowRight: "right"
-      };
+    // inputs simples (enviamos sempre o estado atual do input)
+    const input = { left: false, right: false, up: false, attack: false };
 
-      if (map[e.key]) {
-        socket.emit("move", map[e.key]);
-      }
+    function sendInput() {
+      socket.emit("input", input);
+    }
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "a" || e.key === "ArrowLeft") { input.left = true; sendInput(); }
+      if (e.key === "d" || e.key === "ArrowRight") { input.right = true; sendInput(); }
+      if (e.key === "w" || e.key === "ArrowUp") { input.up = true; sendInput(); }
+      if (e.key === " ") { input.attack = true; sendInput(); }
     });
 
-    // Inicia renderização
+    window.addEventListener("keyup", (e) => {
+      if (e.key === "a" || e.key === "ArrowLeft") { input.left = false; sendInput(); }
+      if (e.key === "d" || e.key === "ArrowRight") { input.right = false; sendInput(); }
+      if (e.key === "w" || e.key === "ArrowUp") { input.up = false; sendInput(); }
+      if (e.key === " ") { input.attack = false; sendInput(); }
+    });
+
+    // inicia loop de render (render.js exporta startRenderLoop)
     startRenderLoop();
   </script>
 </body>

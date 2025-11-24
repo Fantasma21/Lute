@@ -21,7 +21,7 @@ socket.on("login-success", (data) => {
 });
 
 // recebe estado sincronizado
-socket.on("room-state", (state) => {
+socket.on("state", (state) => {
   gameState = state;
 });
 
@@ -44,6 +44,7 @@ document.addEventListener("keydown", (e) => {
 
   // ataque
   if (e.key === " ") {
-    socket.emit("attack");
+    socket.emit("move", dir);
+
   }
 });

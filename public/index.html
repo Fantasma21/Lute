@@ -2,27 +2,44 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Lute PvP</title>
+  <title>Lute Multiplayer</title>
+  <style>
+    body { 
+      font-family: Arial; 
+      text-align: center; 
+      margin-top: 100px;
+    }
+    input, button {
+      padding: 10px;
+      font-size: 18px;
+      margin: 10px;
+    }
+  </style>
 </head>
 <body>
-  <h2>Login</h2>
-  <input id="name" placeholder="Seu nome"><br><br>
 
-  <h3>Escolha uma sala</h3>
-  <input id="room" placeholder="Ex: sala1"><br><br>
+  <h1>Lute PvP Multiplayer</h1>
 
-  <button onclick="login()">Entrar</button>
+  <input id="name" placeholder="Seu nome"><br>
+  <input id="room" placeholder="ID da sala"><br>
+  <button onclick="go()">Entrar</button>
 
   <script>
-    function login() {
-      const name = document.getElementById("name").value
-      const room = document.getElementById("room").value
+    function go() {
+      const name = document.getElementById("name").value.trim();
+      const room = document.getElementById("room").value.trim();
 
-      localStorage.setItem("playerName", name)
-      localStorage.setItem("roomId", room)
+      if (!name || !room) {
+        alert("Digite nome e sala!");
+        return;
+      }
 
-      window.location.href = "game.html"
+      localStorage.setItem("playerName", name);
+      localStorage.setItem("roomId", room);
+
+      window.location.href = "game.html";
     }
   </script>
+
 </body>
 </html>
