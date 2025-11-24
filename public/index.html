@@ -1,45 +1,189 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-br">
 <head>
-  <meta charset="utf-8">
-  <title>Lute Multiplayer</title>
-  <style>
-    body { 
-      font-family: Arial; 
-      text-align: center; 
-      margin-top: 100px;
-    }
-    input, button {
-      padding: 10px;
-      font-size: 18px;
-      margin: 10px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LUTE - Jogo de Luta PVP</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- Tela de Menu Principal -->
+    <div id="main-menu" class="screen active">
+        <div class="menu-container">
+            <h1 class="game-title">🥊 LUTE</h1>
+            <p class="game-subtitle">Duelo 1v1 em Tempo Real</p>
+            
+            <div class="menu-options">
+                <div class="input-group">
+                    <label for="playerName">Seu Nome:</label>
+                    <input type="text" id="playerName" placeholder="Digite seu nome" maxlength="12" value="Jogador">
+                </div>
+                
+                <div class="input-group">
+                    <label for="roomCode">Código da Sala:</label>
+                    <div class="input-with-button">
+                        <input type="text" id="roomCode" placeholder="Digite ou gere um código" maxlength="8">
+                        <button id="generateCode" class="btn-secondary">Gerar</button>
+                    </div>
+                </div>
+                
+                <button id="joinRoom" class="btn-primary">🎮 Entrar na Batalha</button>
+                
+                <div class="game-info">
+                    <h3>🎯 Como Jogar:</h3>
+                    <div class="controls-list">
+                        <div class="control-item">
+                            <span class="key">A / ←</span>
+                            <span>Mover Esquerda</span>
+                        </div>
+                        <div class="control-item">
+                            <span class="key">D / →</span>
+                            <span>Mover Direita</span>
+                        </div>
+                        <div class="control-item">
+                            <span class="key">W / ↑</span>
+                            <span>Pular</span>
+                        </div>
+                        <div class="control-item">
+                            <span class="key">ESPAÇO</span>
+                            <span>Atacar</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-  <h1>Lute PvP Multiplayer</h1>
+    <!-- Tela de Sala de Espera -->
+    <div id="waiting-room" class="screen">
+        <div class="menu-container">
+            <h1>🕒 Aguardando Oponente</h1>
+            <div class="room-info">
+                <p><strong>Sala:</strong> <span id="currentRoomCode">---</span></p>
+                <p><strong>Jogadores:</strong> <span id="playerCount">1/2</span></p>
+            </div>
+            <div class="players-list">
+                <h3>Jogadores Conectados:</h3>
+                <ul id="waitingPlayersList">
+                    <li>Você</li>
+                </ul>
+            </div>
+            <div class="waiting-message">
+                <p>⌛ Aguardando segundo jogador...</p>
+                <p>Compartilhe o código da sala com seu amigo!</p>
+            </div>
+            <button id="cancelWait" class="btn-secondary">❌ Cancelar</button>
+        </div>
+    </div>
 
-  <input id="name" placeholder="Seu nome"><br>
-  <input id="room" placeholder="ID da sala"><br>
-  <button onclick="go()">Entrar</button>
+    <!-- Tela de Jogo -->
+    <div id="game-screen" class="screen">
+        <div class="game-ui">
+            <div class="score-board">
+                <div class="player-score" id="player1-score">
+                    <span class="player-name" id="p1-name">Jogador 1</span>
+                    <div class="health-bar">
+                        <div class="health-fill" id="p1-health" style="width: 100%;"></div>
+                    </div>
+                    <span class="health-text" id="p1-health-text">100%</span>
+                </div>
+                
+                <div class="vs-badge">VS</div>
+                
+                <div class="player-score" id="player2-score">
+                    <span class="player-name" id="p2-name">Jogador 2</span>
+                    <div class="health-bar">
+                        <div class="health-fill" id="p2-health" style="width: 100%;"></div>
+                    </div>
+                    <span class="health-text" id="p2-health-text">100%</span>
+                </div>
+            </div>
+            
+            <div class="game-timer" id="game-timer">02:00</div>
+        </div>
+        
+        <canvas id="screen" width="800" height="400"></canvas>
+        
+        <div class="game-controls">
+            <button id="leaveGame" class="btn-exit">🏃 Sair do Jogo</button>
+        </div>
+    </div>
 
-  <script>
-    function go() {
-      const name = document.getElementById("name").value.trim();
-      const room = document.getElementById("room").value.trim();
+    <!-- Tela de Vitória -->
+    <div id="victory-screen" class="screen">
+        <div class="victory-container">
+            <h1 id="victory-title">🎉 Vitória!</h1>
+            <div id="winner-info" class="winner-info">
+                <span id="winner-name">Jogador</span> venceu o duelo!
+            </div>
+            <div class="match-stats">
+                <p><strong>Tempo:</strong> <span id="match-time">00:00</span></p>
+                <p><strong>Vida restante:</strong> <span id="winner-health">100%</span></p>
+            </div>
+            <div class="victory-options">
+                <button id="playAgain" class="btn-primary">🔄 Jogar Novamente</button>
+                <button id="backToMenu" class="btn-secondary">🏠 Menu Principal</button>
+            </div>
+        </div>
+    </div>
 
-      if (!name || !room) {
-        alert("Digite nome e sala!");
-        return;
-      }
+    <!-- Scripts -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="script.js"></script>
 
-      localStorage.setItem("playerName", name);
-      localStorage.setItem("roomId", room);
-
-      window.location.href = "game.html";
-    }
-  </script>
-
+    <style>
+        /* Estilos adicionais para melhorar a experiência */
+        .input-with-button {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .input-with-button input {
+            flex: 1;
+        }
+        
+        .input-with-button button {
+            white-space: nowrap;
+        }
+        
+        .waiting-message {
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .waiting-message p {
+            margin: 5px 0;
+        }
+        
+        /* Melhorar responsividade dos botões */
+        @media (max-width: 480px) {
+            .input-with-button {
+                flex-direction: column;
+            }
+            
+            .input-with-button button {
+                width: 100%;
+            }
+            
+            .victory-options {
+                flex-direction: column;
+            }
+        }
+        
+        /* Estados de loading para botões */
+        .btn-loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+        
+        /* Animações de transição */
+        .screen {
+            transition: opacity 0.3s ease;
+        }
+    </style>
 </body>
 </html>

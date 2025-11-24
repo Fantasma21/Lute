@@ -2,9 +2,10 @@ import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 
-const ATTACK_DURATION = 0.35; // duração total do ataque em s
-const ATTACK_ACTIVE_WINDOW_START = 0.12; // em s (ex: começa depois de 120ms)
-const ATTACK_ACTIVE_WINDOW_END = 0.20;   // em s
+// Configurações do jogo
+const ATTACK_DURATION = 0.35; // duração total do ataque em segundos
+const ATTACK_ACTIVE_WINDOW_START = 0.12; // janela de hit começa em 120ms
+const ATTACK_ACTIVE_WINDOW_END = 0.20;   // janela de hit termina em 200ms
 
 const app = express();
 app.use(express.static("public"));
@@ -12,24 +13,28 @@ app.use(express.static("public"));
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Simulação
+// Constantes de simulação
 const TICK_RATE = 60; // ticks por segundo
 const DT = 1 / TICK_RATE;
-const GRAVITY = 1200; // px/s^2 (ajustável)
-const GROUND_Y = 320; // y do chão (ajustar se seu canvas for diferente)
+const GRAVITY = 1200; // px/s^2
+const GROUND_Y = 320; // posição Y do chão
 const PLAYER_WIDTH = 50;
 const PLAYER_HEIGHT = 80;
 
-const rooms = {}; // rooms[id] = { players: { socketId: player }, inputs: { socketId: input }, running: true }
+const rooms = {}; // rooms[roomId] = { players: {}, inputs: {}, running: boolean }
 
+// Criar uma nova sala
 function createRoom(roomId) {
   rooms[roomId] = {
     players: {},
     inputs: {},
-    running: true
+    running: true,
+    loopInterval: null
   };
+  console.log(`🆕 Sala criada: ${roomId}`);
 }
 
+// Verificar colisão AABB (Axis-Aligned Bounding Box)
 function aabbCollision(a, b) {
   return (
     a.x < b.x + b.w &&
@@ -39,22 +44,64 @@ function aabbCollision(a, b) {
   );
 }
 
-io.on("connection", socket => {
-  console.log("> Conectado:", socket.id);
+// Verificar se o jogo terminou
+function checkGameOver(roomId, players) {
+  const playerList = Object.values(players);
+  const alivePlayers = playerList.filter(p => p.health > 0);
+  
+  // Jogo termina se só tiver 1 jogador vivo
+  if (alivePlayers.length === 1 && playerList.length === 2) {
+    const winner = alivePlayers[0];
+    const loser = playerList.find(p => p.health <= 0);
+    
+    console.log(`🏆 Fim de jogo na sala ${roomId}! Vencedor: ${winner.name}`);
+    
+    // Notificar todos os jogadores
+    io.to(roomId).emit("game-over", {
+      winner: winner.id,
+      loser: loser.id,
+      winnerName: winner.name
+    });
+    
+    // Parar o loop do jogo
+    const room = rooms[roomId];
+    if (room && room.loopInterval) {
+      clearInterval(room.loopInterval);
+      room.loopInterval = null;
+      room.running = false;
+    }
+    
+    return true;
+  }
+  
+  return false;
+}
 
-  // join
+io.on("connection", socket => {
+  console.log("🔗 Conectado:", socket.id);
+
+  // Entrar em uma sala
   socket.on("join-room", ({ playerName, roomId }) => {
-    if (!rooms[roomId]) createRoom(roomId);
+    console.log(`🎪 ${playerName} tentando entrar na sala ${roomId}`);
+    
+    // Criar sala se não existir
+    if (!rooms[roomId]) {
+      createRoom(roomId);
+    }
+    
     const room = rooms[roomId];
 
+    // Verificar se sala está cheia
     if (Object.keys(room.players).length >= 2) {
+      console.log(`❌ Sala ${roomId} cheia!`);
       socket.emit("room-full");
       return;
     }
 
-    // spawn esquerdo/direito
+    // Definir posição de spawn (esquerda/direita)
     const spawnX = Object.keys(room.players).length === 0 ? 100 : 700;
 
+    // Criar jogador
     room.players[socket.id] = {
       id: socket.id,
       name: playerName,
@@ -68,164 +115,268 @@ io.on("connection", socket => {
       state: "idle",
       health: 100,
       attacking: false,
-      attackTimer: 0
+      attackTimer: 0,
+      attackHitApplied: false // ✅ CORRIGIDO: Variável definida
     };
 
-    // inputs defaults
+    // Configurar inputs padrão
     room.inputs[socket.id] = {
-      left: false, right: false, up: false, attack: false
+      left: false, 
+      right: false, 
+      up: false, 
+      attack: false
     };
 
+    // Entrar na sala Socket.io
     socket.join(roomId);
     socket.roomId = roomId;
 
+    // Notificar sucesso no login
     socket.emit("login-success", { playerId: socket.id });
+    
+    // Notificar todos na sala sobre o novo jogador
+    const roomPlayers = Object.keys(room.players);
+    io.to(roomId).emit("player-joined", {
+      playerId: socket.id,
+      playerName: playerName,
+      roomPlayers: roomPlayers
+    });
+
+    // Enviar estado atual para todos
     io.to(roomId).emit("state", room.players);
 
-    console.log(`> ${playerName} entrou em ${roomId}`);
+    console.log(`✅ ${playerName} entrou em ${roomId} (${roomPlayers.length}/2)`);
 
-    // start loop se for o primeiro jogador (evita múltiplos loops)
-    if (!room.loopInterval) {
+    // Iniciar loop do jogo se for o primeiro jogador
+    if (!room.loopInterval && roomPlayers.length === 1) {
+      console.log(`🎮 Iniciando loop da sala ${roomId}`);
       room.loopInterval = setInterval(() => gameLoop(roomId), 1000 / TICK_RATE);
     }
   });
 
-  // recebe inputs (substitui eventos move/attack individuais)
+  // Receber inputs dos jogadores
   socket.on("input", (input) => {
     const roomId = socket.roomId;
     if (!roomId) return;
+    
     const room = rooms[roomId];
     if (!room || !room.inputs[socket.id]) return;
 
-    // input = { left: bool, right: bool, up: bool, attack: bool }
+    // Atualizar inputs do jogador
     room.inputs[socket.id] = input;
   });
 
-  socket.on("disconnect", () => {
+  // ✅ CORRIGIDO: Evento para sair da sala
+  socket.on("leave-room", () => {
     const roomId = socket.roomId;
     if (!roomId || !rooms[roomId]) return;
 
-    delete rooms[roomId].players[socket.id];
-    delete rooms[roomId].inputs[socket.id];
+    console.log(`🚪 ${socket.id} saindo da sala ${roomId}`);
+    
+    const room = rooms[roomId];
+    const playerName = room.players[socket.id]?.name || "Jogador";
 
-    io.to(roomId).emit("state", rooms[roomId].players);
+    // Remover jogador
+    delete room.players[socket.id];
+    delete room.inputs[socket.id];
 
-    // se ninguém na sala, limpar loop
-    if (Object.keys(rooms[roomId].players).length === 0) {
-      clearInterval(rooms[roomId].loopInterval);
+    // Notificar outros jogadores
+    const remainingPlayers = Object.keys(room.players);
+    socket.to(roomId).emit("player-left", {
+      playerId: socket.id,
+      playerName: playerName,
+      roomPlayers: remainingPlayers
+    });
+
+    // Parar loop se sala estiver vazia
+    if (remainingPlayers.length === 0) {
+      console.log(`🗑️ Sala ${roomId} vazia - removendo`);
+      if (room.loopInterval) {
+        clearInterval(room.loopInterval);
+      }
       delete rooms[roomId];
+    } else {
+      // Atualizar estado para jogadores restantes
+      io.to(roomId).emit("state", room.players);
     }
 
-    console.log("> Desconectado:", socket.id);
+    // Limpar referência da sala
+    socket.roomId = null;
+  });
+
+  socket.on("disconnect", () => {
+    console.log("🔌 Desconectado:", socket.id);
+    
+    // Tratar desconexão como saída da sala
+    const roomId = socket.roomId;
+    if (roomId && rooms[roomId]) {
+      const room = rooms[roomId];
+      const playerName = room.players[socket.id]?.name || "Jogador";
+
+      delete room.players[socket.id];
+      delete room.inputs[socket.id];
+
+      const remainingPlayers = Object.keys(room.players);
+      socket.to(roomId).emit("player-left", {
+        playerId: socket.id,
+        playerName: playerName,
+        roomPlayers: remainingPlayers
+      });
+
+      if (remainingPlayers.length === 0) {
+        if (room.loopInterval) {
+          clearInterval(room.loopInterval);
+        }
+        delete rooms[roomId];
+      } else {
+        io.to(roomId).emit("state", room.players);
+      }
+    }
   });
 });
 
+// Loop principal do jogo
 function gameLoop(roomId) {
   const room = rooms[roomId];
-  if (!room) return;
+  if (!room || !room.running) return;
 
   const players = room.players;
   const inputs = room.inputs;
 
   // Simular física e ações para cada jogador
   for (const id in players) {
-    const p = players[id];
-    const inp = inputs[id] || { left: false, right: false, up: false, attack: false };
+    const player = players[id];
+    const input = inputs[id] || { 
+      left: false, right: false, up: false, attack: false 
+    };
 
-    // MOVIMENTO HORIZONTAL
+    // 🎮 MOVIMENTO HORIZONTAL
     const SPEED = 240; // px/s
-    let ax = 0;
-    if (inp.left) ax = -SPEED;
-    else if (inp.right) ax = SPEED;
-    else ax = 0;
+    let accelerationX = 0;
+    
+    if (input.left) accelerationX = -SPEED;
+    else if (input.right) accelerationX = SPEED;
+    
+    player.vx = accelerationX;
 
-    // atribuir velocidade horizontal diretamente (sem aceleração complexa)
-    p.vx = ax;
-
-    // PULO (só quando está no chão)
-    if (inp.up && Math.abs(p.vy) < 0.001 && p.y >= GROUND_Y - p.h - 0.5) {
-      p.vy = -650; // impulso do pulo (ajustar conforme necessidade)
-      p.state = "jump";
+    // 🦘 PULO (só quando está no chão)
+    if (input.up && Math.abs(player.vy) < 0.001 && player.y >= GROUND_Y - player.h - 0.5) {
+      player.vy = -650; // impulso do pulo
+      player.state = "jump";
     }
 
-    // ATAQUE
-    if (inp.attack && !p.attacking) {
-      p.attacking = true;
-      p.attackTimer = 0.35; // duração do ataque em segundos
-      p.state = "attack";
+    // 👊 ATAQUE
+    if (input.attack && !player.attacking) {
+      player.attacking = true;
+      player.attackTimer = ATTACK_DURATION;
+      player.attackHitApplied = false; // Resetar flag de hit
+      player.state = "attack";
     }
 
-    // gravidade
-    p.vy += GRAVITY * DT;
+    // ⬇️ GRAVIDADE
+    player.vy += GRAVITY * DT;
 
-    // aplicar velocidades
-    p.x += p.vx * DT;
-    p.y += p.vy * DT;
+    // 🚀 APLICAR VELOCIDADES
+    player.x += player.vx * DT;
+    player.y += player.vy * DT;
 
-    // colisão com chão
-    if (p.y > GROUND_Y - p.h) {
-      p.y = GROUND_Y - p.h;
-      p.vy = 0;
-      if (!p.attacking && Math.abs(p.vx) < 1) p.state = "idle";
-    }
-
-    // limites da arena
-    if (p.x < 0) p.x = 0;
-    if (p.x > 800 - p.w) p.x = 800 - p.w;
-
-    // atualizar attack timer
-    if (p.attacking) {
-  p.attackTimer -= DT;
-
-  // calculamos quanto tempo já passou desde o início:
-  const timeIntoAttack = ATTACK_DURATION - p.attackTimer; // s
-
-  // se estamos dentro da janela ativa e ainda não aplicamos o hit
-  if (!p.attackHitApplied && timeIntoAttack >= ATTACK_ACTIVE_WINDOW_START && timeIntoAttack <= ATTACK_ACTIVE_WINDOW_END) {
-    // detecção de hit (mesma caixa)
-    for (const oid in players) {
-      if (oid === id) continue;
-      const o = players[oid];
-      const attackBox = {
-        x: p.facing === "right" ? p.x + p.w : p.x - 40,
-        y: p.y + 20,
-        w: 40,
-        h: p.h - 30
-      };
-      const targetBox = { x: o.x, y: o.y, w: o.w, h: o.h };
-      if (aabbCollision(attackBox, targetBox)) {
-        o.health -= 15;
-        if (o.health < 0) o.health = 0;
-        o.state = "hit";
-        o.vx = p.facing === "right" ? 120 : -120;
+    // 🏞️ COLISÃO COM CHÃO
+    if (player.y > GROUND_Y - player.h) {
+      player.y = GROUND_Y - player.h;
+      player.vy = 0;
+      if (!player.attacking && Math.abs(player.vx) < 1) {
+        player.state = "idle";
       }
     }
-    p.attackHitApplied = true;
-  }
 
-  // fim do ataque
-  if (p.attackTimer <= 0) {
-    p.attacking = false;
-    p.attackTimer = 0;
-    p.attackHitApplied = false;
-    p.state = "idle";
-  }
-}
+    // 🎯 LIMITES DA ARENA
+    if (player.x < 0) player.x = 0;
+    if (player.x > 800 - player.w) player.x = 800 - player.w;
 
-    // atualizar facing com base no vx se houver movimento
-    if (p.vx > 1) p.facing = "right";
-    if (p.vx < -1) p.facing = "left";
+    // ⏰ ATUALIZAR ATAQUE
+    if (player.attacking) {
+      player.attackTimer -= DT;
 
-    // checar vida
-    if (p.health <= 0) {
-      p.state = "dead";
-      p.vx = 0;
-      p.vy = 0;
+      // Calcular tempo decorrido desde o início do ataque
+      const timeIntoAttack = ATTACK_DURATION - player.attackTimer;
+
+      // 🔥 JANELA ATIVA DO ATAQUE (onde o hit é aplicado)
+      if (!player.attackHitApplied && 
+          timeIntoAttack >= ATTACK_ACTIVE_WINDOW_START && 
+          timeIntoAttack <= ATTACK_ACTIVE_WINDOW_END) {
+        
+        // Detectar colisão com outros jogadores
+        for (const otherId in players) {
+          if (otherId === id) continue; // Pular o próprio jogador
+          
+          const opponent = players[otherId];
+          const attackBox = {
+            x: player.facing === "right" ? player.x + player.w : player.x - 40,
+            y: player.y + 20,
+            w: 40,
+            h: player.h - 30
+          };
+          
+          const targetBox = { 
+            x: opponent.x, 
+            y: opponent.y, 
+            w: opponent.w, 
+            h: opponent.h 
+          };
+          
+          // Verificar colisão
+          if (aabbCollision(attackBox, targetBox)) {
+            console.log(`💥 ${player.name} acertou ${opponent.name}!`);
+            
+            // Aplicar dano
+            opponent.health -= 15;
+            if (opponent.health < 0) opponent.health = 0;
+            
+            // Efeito de hit
+            opponent.state = "hit";
+            opponent.vx = player.facing === "right" ? 120 : -120;
+            
+            // Marcar que o hit foi aplicado
+            player.attackHitApplied = true;
+          }
+        }
+      }
+
+      // 🛑 FIM DO ATAQUE
+      if (player.attackTimer <= 0) {
+        player.attacking = false;
+        player.attackTimer = 0;
+        player.attackHitApplied = false;
+        player.state = "idle";
+      }
+    }
+
+    // 🧭 ATUALIZAR DIREÇÃO
+    if (player.vx > 1) player.facing = "right";
+    if (player.vx < -1) player.facing = "left";
+
+    // ❤️ VERIFICAR VIDA
+    if (player.health <= 0) {
+      player.state = "dead";
+      player.vx = 0;
+      player.vy = 0;
     }
   }
 
-  // enviar estado (autoritative)
+  // ✅ VERIFICAR FIM DE JOGO
+  if (checkGameOver(roomId, players)) {
+    return; // Parar se o jogo terminou
+  }
+
+  // 📡 ENVIAR ESTADO ATUALIZADO PARA TODOS OS JOGADORES
   io.to(roomId).emit("state", players);
 }
 
-server.listen(3000, () => console.log("🔥 Server online na porta 3000"));
+// Iniciar servidor
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`🔥 Servidor LUTE online na porta ${PORT}`);
+  console.log(`🎮 Acesse: http://localhost:${PORT}`);
+});
+
+export default server;

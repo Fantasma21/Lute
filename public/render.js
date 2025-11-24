@@ -1,230 +1,346 @@
-// public/render.js
-// Módulo ES: renderiza o estado vindo do servidor usando sprites em /jet e /s-quebrada
-
+// public/render.js - Sistema de Renderização Simplificado
 const canvas = document.getElementById("screen");
 const ctx = canvas.getContext("2d");
 canvas.width = 800;
 canvas.height = 400;
 
 let localPlayerId = null;
-let latestState = {}; // objeto players vindo do server
+let latestState = {};
 
-// Config do sprite (mapa state -> sheet image + frames)
-const SPRITES = {
-  left: { // jogador que spawnou à esquerda (usaremos /jet)
+// Carregar imagem de fundo
+const backgroundImage = new Image();
+backgroundImage.src = '/fundoGame.png';
+let backgroundLoaded = false;
+
+backgroundImage.onload = () => {
+  backgroundLoaded = true;
+  console.log("✅ Fundo carregado: fundoGame.png");
+};
+
+backgroundImage.onerror = () => {
+  console.log("⚠️  Fundo não carregado, usando fallback");
+  backgroundLoaded = false;
+};
+
+// Configuração SIMPLES das sprites - uma por estado
+const SPRITES_CONFIG = {
+  left: { // Jogador esquerdo (jet)
     basePath: '/jet',
     states: {
-      idle: { file: 'parado.png', frames: 4 },
-      run:  { file: 'correndo.png', frames: 6 },
-      jump: { file: 'salto.png', frames: 2 },
-      fall: { file: 'caindo.png', frames: 2 },
-      attack: { file: 'ataque.png', frames: 5 },
-      hit: { file: 'hit.png', frames: 4 },
-      dead: { file: 'morto.png', frames: 6 }
+      idle: 'parado.png',
+      run: 'correndo.png', 
+      jump: 'salto.png',
+      fall: 'caindo.png',
+      attack: 'ataque.png',
+      hit: 'hit.png',
+      dead: 'morto.png'
     }
   },
-  right: { // jogador que spawnou à direita (usaremos /s-quebrada)
+  right: { // Jogador direito (s-quebrada)
     basePath: '/s-quebrada',
     states: {
-      idle: { file: 'parado.png', frames: 5 },
-      run:  { file: 'correndo.png', frames: 3 },
-      jump: { file: 'salto.png', frames: 2 },
-      fall: { file: 'caindo.png', frames: 2 },
-      attack: { file: 'ataque.png', frames: 5 },
-      hit: { file: 'hit.png', frames: 3 },
-      dead: { file: 'morto.png', frames: 6 }
+      idle: 'parado.png',
+      run: 'correndo.png',
+      jump: 'salto.png', 
+      fall: 'caindo.png',
+      attack: 'ataque.png',
+      hit: 'hit.png',
+      dead: 'morto.png'
     }
   }
 };
 
-// cache de imagens e estado de animação por player id
-const playersRender = {}; 
-// playersRender[id] = {
-//   spriteSide: 'left'|'right',
-//   anim: { img, framesMax, frameIndex, frameTimer, frameInterval },
-//   pos: { x,y,w,h },
-//   name
-// }
+// Cache de imagens
+const imageCache = {};
+const playersRender = {};
 
-export function setLocalPlayerId(id) {
-  localPlayerId = id;
+// Função simples para carregar imagem
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    if (imageCache[src]) {
+      resolve(imageCache[src]);
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      imageCache[src] = img;
+      resolve(img);
+    };
+    img.onerror = () => {
+      console.warn("❌ Não foi possível carregar:", src);
+      reject(new Error(`Failed to load: ${src}`));
+    };
+    img.src = src;
+  });
 }
 
-// chamada do server para atualizar o state (state = players object)
+// Definir jogador local
+export function setLocalPlayerId(id) {
+  localPlayerId = id;
+  console.log("🎮 Player local definido:", id);
+}
+
+// Atualizar estado do jogo
 export function updateState(state) {
   latestState = state;
 
-  // criar entradas de render para novos jogadores
-  const ids = Object.keys(state);
-  for (const id of ids) {
+  // Atualizar ou criar jogadores
+  for (const id of Object.keys(state)) {
+    const playerData = state[id];
+    
     if (!playersRender[id]) {
-      const p = state[id];
-      // decidir mídia: se x < 400 assume "left" (jet), senão "right"
-      const side = (p.x && p.x < 400) ? 'left' : 'right';
-      playersRender[id] = createRenderEntry(side, p);
+      // Novo jogador - determinar lado pelo spawn
+      const side = (playerData.x < 400) ? 'left' : 'right';
+      playersRender[id] = createRenderEntry(side, playerData);
+      console.log(`🆕 Novo jogador: ${playerData.name} (${side})`);
+    }
+
+    const renderObj = playersRender[id];
+    
+    // Atualizar posição e dados
+    renderObj.pos.x = playerData.x;
+    renderObj.pos.y = playerData.y;
+    renderObj.pos.w = playerData.w || 50;
+    renderObj.pos.h = playerData.h || 80;
+    renderObj.name = playerData.name;
+    renderObj.health = playerData.health ?? 100;
+    renderObj.facing = playerData.facing || 'right';
+
+    // Atualizar animação se estado mudou
+    if (playerData.state && playerData.state !== renderObj.currentState) {
+      setPlayerState(renderObj, playerData.state);
     }
   }
 
-  // remover jogadores que saíram
+  // Remover jogadores desconectados
   for (const id in playersRender) {
-    if (!state[id]) delete playersRender[id];
-  }
-
-  // atualizar posições & estado (não sobrepor animações ativas, apenas set state)
-  for (const id of Object.keys(state)) {
-    const p = state[id];
-    const R = playersRender[id];
-    if (!R) continue;
-    R.pos.x = p.x;
-    R.pos.y = p.y;
-    R.pos.w = p.w || 50;
-    R.pos.h = p.h || 80;
-    R.name = p.name || R.name;
-    // se o server reporta 'state', sinalizamos mudança de animação
-    if (p.state) setAnimation(R, p.state, p.facing || 'right');
-    // também controlamos health e attacking para efeitos visuais
-    R.health = p.health ?? R.health;
-    R.attacking = !!p.attacking;
+    if (!state[id]) {
+      delete playersRender[id];
+    }
   }
 }
 
-function createRenderEntry(side, p) {
-  const conf = SPRITES[side];
-  const pos = { x: p.x || 0, y: p.y || 0, w: p.w || 50, h: p.h || 80 };
-  const name = p.name || 'player';
-
-  // default animation = idle
-  const stateConf = conf.states.idle;
-  const img = new Image();
-  img.src = conf.basePath + '/' + stateConf.file;
-
+// Criar entrada de renderização
+function createRenderEntry(side, playerData) {
   return {
     spriteSide: side,
-    pos,
-    name,
-    health: p.health ?? 100,
-    attacking: p.attacking ?? false,
-    anim: {
-      state: 'idle',
-      img,
-      framesMax: stateConf.frames,
-      frameIndex: 0,
-      frameTimer: 0,
-      frameInterval: 1000 / 10 // 10 FPS de animação por padrão
-    }
+    pos: { 
+      x: playerData.x, 
+      y: playerData.y, 
+      w: playerData.w || 50, 
+      h: playerData.h || 80 
+    },
+    name: playerData.name,
+    health: playerData.health ?? 100,
+    facing: playerData.facing || 'right',
+    currentState: 'idle',
+    currentSprite: null,
+    spriteLoadPromise: null
   };
 }
 
-function setAnimation(renderEntry, stateName, facing) {
-  const conf = SPRITES[renderEntry.spriteSide];
-  const stateConf = conf.states[stateName] || conf.states.idle;
-  // se já é essa animação, não reinicia (exceto se for attack, reiniciamos)
-  if (renderEntry.anim.state === stateName && stateName !== 'attack') return;
-
-  renderEntry.anim.state = stateName;
-  renderEntry.anim.framesMax = stateConf.frames;
-  renderEntry.anim.frameIndex = 0;
-  renderEntry.anim.frameTimer = 0;
-  // ajustar frame interval conforme framesMax (mais frames -> mesmo tempo total)
-  renderEntry.anim.frameInterval = Math.max(40, 350 / stateConf.frames); // total ~350ms ataque
-  renderEntry.anim.img = new Image();
-  renderEntry.anim.img.src = conf.basePath + '/' + stateConf.file;
-
-  // guardar facing (para flip horizontal)
-  renderEntry.facing = facing === 'left' ? 'left' : 'right';
+// Definir estado do jogador (animação)
+function setPlayerState(renderObj, newState) {
+  renderObj.currentState = newState;
+  
+  const config = SPRITES_CONFIG[renderObj.spriteSide];
+  const spriteFile = config.states[newState] || config.states.idle;
+  const spritePath = `${config.basePath}/${spriteFile}`;
+  
+  console.log(`🎬 ${renderObj.name}: ${newState} -> ${spriteFile}`);
+  
+  // Carregar sprite
+  renderObj.spriteLoadPromise = loadImage(spritePath)
+    .then(img => {
+      renderObj.currentSprite = img;
+    })
+    .catch(error => {
+      console.warn(`⚠️  Sprite não carregada: ${spritePath}`);
+      renderObj.currentSprite = null;
+    });
 }
 
-// desenha um jogador (com sprites em sheets ou imagens por-frame)
-// Observação: seus PNGs já são imagens separadas por frame (parecem nomes únicos). 
-// Mas aqui tratamos cada arquivo como um "sheet" horizontalmente composto de frames (caso não seja, as imagens ainda funcionam se cada frame for separado).
-function drawPlayer(R, dt) {
-  const a = R.anim;
-  const img = a.img;
-  const frames = a.framesMax || 1;
-  const frameIndex = Math.floor(a.frameIndex);
-
-  // avançar frameTimer
-  a.frameTimer += dt;
-  if (a.frameTimer >= a.frameInterval) {
-    a.frameTimer = 0;
-    a.frameIndex = (a.frameIndex + 1) % frames;
-  }
-
-  // Tentativa de desenhar: assumimos imagem tipo spritesheet com frames horizontais.
-  // Se suas imagens não forem spritesheet, os framesMax devem ser 1 e imagem é completa.
-  const srcW = img.width / Math.max(1, frames);
-  const srcH = img.height;
-  const sx = Math.floor(a.frameIndex) * srcW;
-  const sy = 0;
-
-  const dx = R.pos.x;
-  const dy = R.pos.y;
-  const dw = R.pos.w;
-  const dh = R.pos.h;
-
-  // desenhar flip se necessário
+// Desenhar jogador
+function drawPlayer(renderObj) {
+  const pos = renderObj.pos;
+  
   ctx.save();
-  if (R.facing === 'left') {
-    // flip horizontal: translate & scale
-    ctx.translate(dx + dw/2, 0);
+  
+  // Flip horizontal se virado para esquerda
+  if (renderObj.facing === 'left') {
+    ctx.translate(pos.x + pos.w/2, 0);
     ctx.scale(-1, 1);
-    ctx.translate(-(dx + dw/2), 0);
+    ctx.translate(-(pos.x + pos.w/2), 0);
   }
 
-  // se imagem ainda não carregou medidas, desenha um retângulo como fallback
-  if (!img.complete || img.width === 0) {
-    ctx.fillStyle = (R.spriteSide === 'left') ? '#1E90FF' : '#FF4C4C';
-    ctx.fillRect(dx, dy, dw, dh);
-  } else {
+  // Desenhar sprite ou fallback
+  if (renderObj.currentSprite && renderObj.currentSprite.complete) {
     try {
-      ctx.drawImage(img, sx, sy, srcW, srcH, dx, dy, dw, dh);
-    } catch (err) {
-      // fallback
-      ctx.fillStyle = (R.spriteSide === 'left') ? '#1E90FF' : '#FF4C4C';
-      ctx.fillRect(dx, dy, dw, dh);
+      ctx.drawImage(renderObj.currentSprite, pos.x, pos.y, pos.w, pos.h);
+    } catch (error) {
+      drawFallbackPlayer(renderObj);
     }
+  } else {
+    drawFallbackPlayer(renderObj);
   }
+
   ctx.restore();
+  
+  // Desenhar UI (nome e vida)
+  drawPlayerUI(renderObj);
+}
 
-  // desenhar nome
+// Fallback visual (quando sprites não carregam)
+function drawFallbackPlayer(renderObj) {
+  const pos = renderObj.pos;
+  const stateColors = {
+    idle: '#3498db',    // Azul
+    run: '#2980b9',     // Azul escuro  
+    jump: '#9b59b6',    // Roxo
+    fall: '#8e44ad',    // Roxo escuro
+    attack: '#e74c3c',  // Vermelho
+    hit: '#e67e22',     // Laranja
+    dead: '#95a5a6'     // Cinza
+  };
+  
+  const color = stateColors[renderObj.currentState] || '#3498db';
+  
+  // Corpo
+  ctx.fillStyle = color;
+  ctx.fillRect(pos.x, pos.y, pos.w, pos.h);
+  
+  // Contorno
+  ctx.strokeStyle = '#2c3e50';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(pos.x, pos.y, pos.w, pos.h);
+  
+  // Indicador de estado (debug)
+  ctx.fillStyle = 'white';
+  ctx.font = '10px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(renderObj.currentState, pos.x + pos.w/2, pos.y - 5);
+  ctx.textAlign = 'left';
+}
+
+// Desenhar UI do jogador (nome e vida)
+function drawPlayerUI(renderObj) {
+  const pos = renderObj.pos;
+  
+  // Nome
   ctx.fillStyle = "white";
-  ctx.font = "14px Arial";
-  ctx.fillText(R.name, dx, dy - 8);
+  ctx.font = "12px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText(renderObj.name, pos.x + pos.w/2, pos.y - 25);
+  
+  // Barra de vida
+  const barWidth = 60;
+  const barHeight = 6;
+  const barX = pos.x + (pos.w - barWidth) / 2;
+  const barY = pos.y - 20;
+  
+  // Fundo da barra
+  ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+  ctx.fillRect(barX, barY, barWidth, barHeight);
+  
+  // Vida (cores dinâmicas)
+  const healthPercent = renderObj.health / 100;
+  let healthColor = "#2ecc71"; // Verde
+  if (healthPercent < 0.5) healthColor = "#f39c12"; // Amarelo
+  if (healthPercent < 0.25) healthColor = "#e74c3c"; // Vermelho
+  
+  ctx.fillStyle = healthColor;
+  ctx.fillRect(barX, barY, barWidth * healthPercent, barHeight);
+  
+  // Borda da barra
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(barX, barY, barWidth, barHeight);
+  
+  // Texto da vida
+  ctx.fillStyle = "white";
+  ctx.font = "10px Arial";
+  ctx.fillText(
+    `${Math.round(renderObj.health)}%`, 
+    barX + barWidth + 5, 
+    barY + barHeight + 3
+  );
+  
+  ctx.textAlign = "left";
+}
 
-  // desenhar vida
-  ctx.fillStyle = "black";
-  ctx.fillRect(dx, dy - 18, 60, 8);
-  ctx.fillStyle = "lime";
-  ctx.fillRect(dx, dy - 18, Math.max(0, (R.health / 100) * 60), 8);
+// Loop de renderização
+let lastTimestamp = 0;
+export function startRenderLoop() {
+  console.log("🎬 Iniciando loop de renderização...");
+  
+  function render(currentTime) {
+    const deltaTime = currentTime - lastTimestamp;
+    lastTimestamp = currentTime;
+    
+    // Limpar canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Desenhar fundo
+    drawBackground();
+    
+    // Desenhar chão
+    drawGround();
+    
+    // Desenhar jogadores (ordenados por posição X para depth)
+    const sortedPlayers = Object.values(playersRender)
+      .sort((a, b) => a.pos.x - b.pos.x);
+    
+    for (const player of sortedPlayers) {
+      drawPlayer(player);
+    }
+    
+    // Continuar loop
+    requestAnimationFrame(render);
+  }
+  
+  // Iniciar loop
+  requestAnimationFrame(render);
+}
 
-  // desenhar caixa de ataque quando atacando (visual)
-  if (R.attacking) {
-    ctx.strokeStyle = "yellow";
-    ctx.lineWidth = 2;
-    const ax = R.facing === 'right' ? dx + R.pos.w : dx - 40;
-    ctx.strokeRect(ax, dy + 20, 40, R.pos.h - 30);
+// Desenhar fundo
+function drawBackground() {
+  if (backgroundLoaded) {
+    // Preencher todo o canvas com o fundo
+    ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+  } else {
+    // Fallback: gradiente
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, "#1a1a2e");
+    gradient.addColorStop(1, "#16213e");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 }
 
-// render loop
-let lastTs = 0;
-export function startRenderLoop() {
-  function loop(ts) {
-    const dt = Math.min(100, ts - lastTs); // ms
-    lastTs = ts;
+// Desenhar chão
+function drawGround() {
+  // Sombra do chão
+  ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+  ctx.fillRect(0, 320, canvas.width, 80);
+  
+  // Chão principal
+  ctx.fillStyle = "#34495e";
+  ctx.fillRect(0, 320, canvas.width, 80);
+  
+  // Linha do chão
+  ctx.fillStyle = "#7f8c8d";
+  ctx.fillRect(0, 320, canvas.width, 4);
+}
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // chão
-    ctx.fillStyle = "#333";
-    ctx.fillRect(0, 320, canvas.width, 80);
-
-    // desenhar todos os players (ordenar por x poderia ser útil)
-    for (const id in playersRender) {
-      drawPlayer(playersRender[id], dt);
-    }
-
-    requestAnimationFrame(loop);
+// Função de debug para ver sprites carregadas
+export function debugSprites() {
+  console.log("🐞 Debug de Sprites:");
+  console.log("- Imagens no cache:", Object.keys(imageCache));
+  console.log("- Jogadores renderizando:", Object.keys(playersRender));
+  
+  for (const id in playersRender) {
+    const player = playersRender[id];
+    console.log(`  ${player.name}: ${player.currentState}, sprite: ${player.currentSprite ? '✅' : '❌'}`);
   }
-  requestAnimationFrame(loop);
 }

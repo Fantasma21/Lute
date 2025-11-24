@@ -1,26 +1,629 @@
-*{
+/* style.css - Estilos Completos e Otimizados */
+* {
+    margin: 0;
+    padding: 0;
     box-sizing: border-box;
 }
 
-#timer{
-    border: 3px solid white;
+body {
+    font-family: 'Arial', sans-serif;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
     color: white;
-    font-size: 25;
+    overflow: hidden;
+    height: 100vh;
+    user-select: none;
+}
+
+/* ==================== TELAS ==================== */
+.screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.screen.active {
+    display: flex;
+    opacity: 1;
+}
+
+/* ==================== MENU PRINCIPAL ==================== */
+.menu-container {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(15px);
+    border-radius: 20px;
+    padding: 40px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    max-width: 500px;
+    width: 90%;
+    animation: fadeInUp 0.5s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.game-title {
+    font-size: 4em;
+    margin-bottom: 10px;
+    background: linear-gradient(45deg, #ff6b6b, #feca57);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.game-subtitle {
+    font-size: 1.2em;
+    margin-bottom: 30px;
+    opacity: 0.8;
+}
+
+.menu-options {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    text-align: left;
+}
+
+.input-group label {
+    font-weight: bold;
+    font-size: 0.9em;
+    opacity: 0.9;
+}
+
+.input-with-button {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.input-with-button input {
+    flex: 1;
+}
+
+.input-group input {
+    padding: 12px 15px;
+    border: none;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 1em;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+}
+
+.input-group input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.input-group input:focus {
+    outline: none;
+    border-color: #feca57;
+    background: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 0 0 2px rgba(254, 202, 87, 0.2);
+}
+
+/* ==================== BOTÕES ==================== */
+.btn-primary {
+    padding: 15px 30px;
+    background: linear-gradient(45deg, #ff6b6b, #feca57);
+    border: none;
+    border-radius: 10px;
+    color: white;
+    font-size: 1.2em;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 10px;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(255, 107, 107, 0.3);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+}
+
+.btn-primary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn-primary:hover::before {
+    left: 100%;
+}
+
+.btn-secondary {
+    padding: 10px 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.9em;
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.btn-exit {
+    padding: 10px 20px;
+    background: rgba(255, 0, 0, 0.3);
+    border: 1px solid rgba(255, 100, 100, 0.5);
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-exit:hover {
+    background: rgba(255, 0, 0, 0.5);
+    transform: translateY(-1px);
+}
+
+/* Estados de loading */
+.btn-loading {
+    opacity: 0.7;
+    pointer-events: none;
+    position: relative;
+}
+
+.btn-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid transparent;
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ==================== CONTROLES ==================== */
+.game-info {
+    margin-top: 30px;
+    text-align: left;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 20px;
+    border-radius: 10px;
+}
+
+.controls-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.control-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    transition: background 0.3s ease;
+}
+
+.control-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.key {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    font-size: 0.9em;
+    min-width: 40px;
+    text-align: center;
+}
+
+/* ==================== SALA DE ESPERA ==================== */
+.room-info {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    border-radius: 10px;
+    margin: 20px 0;
+    text-align: center;
+}
+
+.room-info p {
+    margin: 8px 0;
+    font-size: 1.1em;
+}
+
+.players-list {
+    margin: 20px 0;
+}
+
+.players-list h3 {
+    margin-bottom: 10px;
+    color: #feca57;
+}
+
+.players-list ul {
+    list-style: none;
+    margin-top: 10px;
+}
+
+.players-list li {
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 8px 0;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    border-left: 3px solid transparent;
+}
+
+.players-list li:first-child {
+    border-left-color: #feca57;
+    font-weight: bold;
+    background: rgba(254, 202, 87, 0.1);
+}
+
+.waiting-message {
+    margin: 25px 0;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.waiting-message p {
+    margin: 8px 0;
+    opacity: 0.9;
+}
+
+/* ==================== INTERFACE DO JOGO ==================== */
+#game-screen {
+    flex-direction: column;
+    justify-content: flex-start;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.game-ui {
+    width: 800px;
+    margin-bottom: 20px;
+    animation: slideDown 0.5s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.score-board {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 20px;
+    border-radius: 15px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+}
+
+.player-score {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.player-name {
+    font-weight: bold;
+    font-size: 1.2em;
+    color: #feca57;
+}
+
+.health-bar {
+    width: 200px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.health-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #2ecc71, #f1c40f);
+    border-radius: 8px;
+    transition: width 0.5s ease, background 0.5s ease;
+    position: relative;
+}
+
+.health-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.health-text {
+    font-size: 0.9em;
+    opacity: 0.9;
     font-weight: bold;
 }
 
-#displayText{
-    font-size: 40px;
+.vs-badge {
+    background: linear-gradient(45deg, #ff6b6b, #feca57);
+    padding: 12px 24px;
+    border-radius: 25px;
+    font-weight: bold;
+    margin: 0 25px;
+    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+    animation: pulse 2s infinite;
 }
 
-#pgf {
-    color: rgb(39, 30, 30);
-    position: absolute;  
-    align-items: center; 
-    justify-content: center; 
-    top: 540; 
-    right: 0;
-    bottom: 0; 
-    left: 0;  
-    display: flex;    
+.game-timer {
+    text-align: center;
+    font-size: 1.8em;
+    font-weight: bold;
+    margin-top: 15px;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 12px 25px;
+    border-radius: 12px;
+    display: inline-block;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    font-family: 'Courier New', monospace;
+}
+
+.game-controls {
+    margin-top: 25px;
+    text-align: center;
+}
+
+/* ==================== TELA DE VITÓRIA ==================== */
+.victory-container {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    border-radius: 25px;
+    padding: 60px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4);
+    animation: victoryPulse 2s infinite, fadeIn 0.8s ease-out;
+}
+
+@keyframes victoryPulse {
+    0%, 100% { 
+        transform: scale(1); 
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4);
+    }
+    50% { 
+        transform: scale(1.03); 
+        box-shadow: 0 30px 60px rgba(255, 107, 107, 0.3);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+#victory-title {
+    font-size: 4.5em;
+    margin-bottom: 25px;
+    background: linear-gradient(45deg, #feca57, #ff9ff3, #48dbfb);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-size: 200% 200%;
+    animation: gradientShift 3s ease infinite;
+}
+
+@keyframes gradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+.winner-info {
+    font-size: 1.8em;
+    margin-bottom: 35px;
+    color: #feca57;
+}
+
+.match-stats {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 25px;
+    border-radius: 12px;
+    margin: 25px 0;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.match-stats p {
+    margin: 12px 0;
+    font-size: 1.1em;
+}
+
+.victory-options {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin-top: 35px;
+}
+
+/* ==================== CANVAS DO JOGO ==================== */
+#screen {
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.1);
+}
+
+/* ==================== RESPONSIVIDADE ==================== */
+@media (max-width: 900px) {
+    .menu-container {
+        padding: 25px;
+        margin: 15px;
+    }
+    
+    .game-title {
+        font-size: 3em;
+    }
+    
+    .score-board {
+        flex-direction: column;
+        gap: 20px;
+        padding: 15px;
+    }
+    
+    .game-ui {
+        width: 95%;
+    }
+    
+    .health-bar {
+        width: 150px;
+    }
+    
+    .victory-container {
+        padding: 40px 25px;
+        margin: 15px;
+    }
+    
+    #victory-title {
+        font-size: 3.5em;
+    }
+}
+
+@media (max-width: 480px) {
+    .input-with-button {
+        flex-direction: column;
+    }
+    
+    .input-with-button button {
+        width: 100%;
+        margin-top: 8px;
+    }
+    
+    .controls-list {
+        grid-template-columns: 1fr;
+    }
+    
+    .victory-options {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .vs-badge {
+        margin: 10px 0;
+        padding: 10px 20px;
+    }
+    
+    .game-title {
+        font-size: 2.5em;
+    }
+    
+    #victory-title {
+        font-size: 2.8em;
+    }
+}
+
+/* ==================== UTILITÁRIOS ==================== */
+.control-instructions {
+    pointer-events: none;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.text-gradient {
+    background: linear-gradient(45deg, #ff6b6b, #feca57);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Scrollbar personalizada (para elementos com scroll) */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
 }
