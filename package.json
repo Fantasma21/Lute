@@ -1,17 +1,32 @@
 {
-  "name": "lute",
-  "type": "module",
+  "name": "lute-game",
   "version": "1.0.0",
-  "description": "",
+  "type": "module",
+  "description": "🥊 LUTE - Jogo de Luta PVP em Tempo Real",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "echo \"No tests specified\" && exit 0"
   },
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "game",
+    "multiplayer",
+    "socket.io",
+    "fighting",
+    "pvp"
+  ],
+  "author": "Emanuel Albuquerque",
+  "license": "MIT",
   "dependencies": {
-    "express": "^5.1.0",
-    "socket.io": "^4.8.1"
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Fantasma21/Lute"
   }
 }
